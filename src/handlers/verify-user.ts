@@ -1,17 +1,42 @@
 import { Composer } from "grammy";
+import type { Ctx } from "../bot.js";
+import { now } from "../clock.js";
+import { getGroup, saveGroup } from "../guardian-store.js";
+import { VERIFICATION_WINDOW_MS, isGroup } from "../guardian-shared.js";
 
-// SCAFFOLD — generated from the bot blueprint BEFORE the agent runs.
-// Keep a LIVE registration (.command / .callbackQuery / …) so this feature is
-// never an empty stub. Replace the reply body with real logic + copy; if you
-// change the user-facing text, update tests/specs to match EXACTLY.
-// Do NOT rewrite src/bot.ts — buildBot() already auto-loads this module.
-// Menu: wire this into /start via registerMainMenuItem({ label: "I'm human", data: "verify:user" }) if the toolkit exposes it.
-
-const composer = new Composer();
+const composer = new Composer<Ctx>();
 
 composer.callbackQuery("verify:user", async (ctx) => {
   await ctx.answerCallbackQuery();
-  await ctx.reply("Verification button in welcome message");
+  if (!ctx.chat || !ctx.from || !isGroup(ctx)) {
+    await ctx.reply("Open this button in the group where you joined.");
+    return;
+  }
+  try {
+    const state = await getGroup(ctx.chat.id, ctx);
+    const newcomer = state.newcomers[String(ctx.from.id)];
+    if (!newcomer || newcomer.verified_status) {
+      await ctx.reply("Your verification request isn't active.");
+      return;
+    }
+    if (newcomer.join_time + VERIFICATION_WINDOW_MS <= now()) {
+      try { await ctx.api.banChatMember(ctx.chat.id, newcomer.user_id); } catch { /* show the expiry state either way */ }
+      delete state.newcomers[String(ctx.from.id)];
+      const session = ctx.session as { verificationTokens?: Record<string, { token_id: string; user_id: number; expiry_time: number }> };
+      delete session.verificationTokens?.[String(ctx.from.id)];
+      await saveGroup(ctx.chat.id, state, ctx);
+      await ctx.reply("Your verification window has expired. Ask an admin to invite you again.");
+      return;
+    }
+    newcomer.verified_status = true;
+    const session = ctx.session as { verificationTokens?: Record<string, { token_id: string; user_id: number; expiry_time: number }> };
+    delete session.verificationTokens?.[String(ctx.from.id)];
+    await saveGroup(ctx.chat.id, state, ctx);
+    try { await ctx.api.restrictChatMember(ctx.chat.id, newcomer.user_id, { can_send_messages: true }); } catch { /* verification is still recorded */ }
+    await ctx.editMessageText("You're verified. Welcome to the group.");
+  } catch {
+    await ctx.reply("Verification isn't set up yet. Ask a group admin to finish storage setup.");
+  }
 });
 
 export default composer;

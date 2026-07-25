@@ -1,13 +1,13 @@
 [
   {
-    "name": "/warn",
+    "name": "/warn requires group admin access",
     "steps": [
       {
         "expect": [
           {
             "method": "sendMessage",
             "payload": {
-              "text": "Issue warning to user with optional reason"
+              "text": "This action is available to group admins in the group."
             }
           }
         ],

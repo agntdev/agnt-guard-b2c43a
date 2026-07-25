@@ -51,6 +51,12 @@ interface Reminder {
   text: string;
 }
 
+interface ModerationTask {
+  at: number;
+  chatId: number | string;
+  userId: number;
+}
+
 /**
  * createDurableSessionStorage — a grammY StorageAdapter that routes each session
  * key to its own ChatDO instance. Pass to buildBot({ storage }) in the Worker.
@@ -105,6 +111,24 @@ export async function remindAt(
   }
 }
 
+/** Schedule a verification removal at an exact time on the group's ChatDO. */
+export async function removeUnverifiedAt(
+  env: WorkerEnv,
+  chatId: number | string,
+  userId: number,
+  whenEpochMs: number,
+): Promise<void> {
+  try {
+    const stub = env.CHAT_DO.get(env.CHAT_DO.idFromName("chat:" + chatId));
+    await stub.fetch("https://do/moderate", {
+      method: "POST",
+      body: JSON.stringify({ at: whenEpochMs, chatId, userId } satisfies ModerationTask),
+    });
+  } catch {
+    /* an incoming group update will still retry the durable expiry sweep */
+  }
+}
+
 async function tg(token: string, method: string, payload: unknown): Promise<void> {
   await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
@@ -154,6 +178,15 @@ export class ChatDO {
       return new Response(null, { status: 204 });
     }
 
+    if (url.pathname === "/moderate" && request.method === "POST") {
+      const task = (await request.json()) as ModerationTask;
+      const list = (await this.state.storage.get<ModerationTask[]>("moderation")) ?? [];
+      list.push(task);
+      await this.state.storage.put("moderation", list);
+      await this.rearm([...list, ...((await this.state.storage.get<Reminder[]>("reminders")) ?? [])]);
+      return new Response(null, { status: 204 });
+    }
+
     return new Response("not found", { status: 404 });
   }
 
@@ -164,14 +197,21 @@ export class ChatDO {
     const list = (await this.state.storage.get<Reminder[]>("reminders")) ?? [];
     const due = list.filter((r) => r.at <= now);
     const rest = list.filter((r) => r.at > now);
+    const moderation = (await this.state.storage.get<ModerationTask[]>("moderation")) ?? [];
+    const dueModeration = moderation.filter((r) => r.at <= now);
+    const remainingModeration = moderation.filter((r) => r.at > now);
     for (const r of due) {
       await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: r.chatId, text: r.text });
     }
+    for (const task of dueModeration) {
+      try { await tg(this.env.BOT_TOKEN, "banChatMember", { chat_id: task.chatId, user_id: task.userId }); } catch { /* retried only by group activity */ }
+    }
     await this.state.storage.put("reminders", rest);
-    await this.rearm(rest);
+    await this.state.storage.put("moderation", remainingModeration);
+    await this.rearm([...rest, ...remainingModeration]);
   }
 
-  private async rearm(list: Reminder[]): Promise<void> {
+  private async rearm(list: Array<Reminder | ModerationTask>): Promise<void> {
     if (list.length === 0) return;
     const next = Math.min(...list.map((r) => r.at));
     const current = await this.state.storage.getAlarm();

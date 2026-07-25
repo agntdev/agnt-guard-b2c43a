@@ -1,0 +1,20 @@
+[
+  {
+    "name": "admin controls require a group admin",
+    "steps": [
+      {
+        "send": { "callback": "guardian:admin" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
+      }
+    ]
+  },
+  {
+    "name": "overview command requires a group admin",
+    "steps": [
+      {
+        "send": { "text": "/overview" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
+      }
+    ]
+  }
+]
