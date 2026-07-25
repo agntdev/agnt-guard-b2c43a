@@ -1,0 +1,11 @@
+[
+  {
+    "name": "kick command requires a group admin",
+    "steps": [
+      {
+        "send": { "text": "/kick spam" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
+      }
+    ]
+  }
+]

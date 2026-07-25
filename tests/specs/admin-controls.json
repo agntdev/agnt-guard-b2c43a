@@ -16,5 +16,41 @@
         "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
       }
     ]
+  },
+  {
+    "name": "set welcome command requires a group admin",
+    "steps": [
+      {
+        "send": { "text": "/setwelcome Welcome to the community." },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
+      }
+    ]
+  },
+  {
+    "name": "set rules command requires a group admin",
+    "steps": [
+      {
+        "send": { "text": "/setrules Be respectful." },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
+      }
+    ]
+  },
+  {
+    "name": "set auto-actions command requires a group admin",
+    "steps": [
+      {
+        "send": { "text": "/setautoactions 10/10s" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
+      }
+    ]
+  },
+  {
+    "name": "moderation log command requires a group admin",
+    "steps": [
+      {
+        "send": { "text": "/log" },
+        "expect": [{ "method": "sendMessage", "payload": { "text": "This action is available to group admins in the group." } }]
+      }
+    ]
   }
 ]
