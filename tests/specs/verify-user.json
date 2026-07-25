@@ -1,13 +1,13 @@
 [
   {
-    "name": "I'm human",
+    "name": "verification only works in its group",
     "steps": [
       {
         "expect": [
           {
             "method": "sendMessage",
             "payload": {
-              "text": "Verification button in welcome message"
+              "text": "Open this button in the group where you joined."
             }
           }
         ],

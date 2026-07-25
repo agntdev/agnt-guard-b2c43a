@@ -1,13 +1,13 @@
 [
   {
-    "name": "/mute",
+    "name": "/mute requires group admin access",
     "steps": [
       {
         "expect": [
           {
             "method": "sendMessage",
             "payload": {
-              "text": "Mute user for specified duration"
+              "text": "This action is available to group admins in the group."
             }
           }
         ],

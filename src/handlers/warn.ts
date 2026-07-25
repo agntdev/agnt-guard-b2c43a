@@ -1,15 +1,20 @@
 import { Composer } from "grammy";
+import type { Ctx } from "../bot.js";
+import { commandTail, logAction, repliedUserId, requireAdmin } from "../guardian-shared.js";
 
-// SCAFFOLD — generated from the bot blueprint BEFORE the agent runs.
-// Keep a LIVE registration (.command / .callbackQuery / …) so this feature is
-// never an empty stub. Replace the reply body with real logic + copy; if you
-// change the user-facing text, update tests/specs to match EXACTLY.
-// Do NOT rewrite src/bot.ts — buildBot() already auto-loads this module.
-
-const composer = new Composer();
+const composer = new Composer<Ctx>();
 
 composer.command("warn", async (ctx) => {
-  await ctx.reply("Issue warning to user with optional reason");
+  if (!(await requireAdmin(ctx))) return;
+  const target = repliedUserId(ctx);
+  if (!target) {
+    await ctx.reply("Reply to the member you want to warn, then send /warn with an optional reason.");
+    return;
+  }
+  const reason = commandTail(ctx) || "No reason provided.";
+  if (await logAction(ctx, { action_type: "warn", user_id: target, reason })) {
+    await ctx.reply(`A member was warned. Reason: ${reason}`);
+  }
 });
 
 export default composer;
